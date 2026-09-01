@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "types": ["@shopify/ui-extensions/checkout"],
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,47 @@
+# Learn more: https://shopify.dev/docs/api/checkout-ui-extensions
+#
+# Pinned to 2025-07: @shopify/ui-extensions-react has no published release for
+# later API versions (2025-10+ only ship for the non-React @shopify/ui-extensions
+# base package), so this is the newest version that still supports the React
+# hooks/components used in src/Checkout.tsx.
+api_version = "2025-07"
+
+[[extensions]]
+name = "Loop Subscription Picker"
+handle = "loop-subscription-picker"
+uid = "b7d776d4-651e-6b57-100c-e3b128df60eca343669b"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  target = "purchase.checkout.block.render"
+  module = "./src/Banner.tsx"
+
+  [extensions.capabilities]
+  # Required to call the Storefront API's `query()` from useApi() (Step 1 of Loop's
+  # upgrade-to-subscription-block guide: fetching eligible selling plans per cart line).
+  api_access = true
+  # Lets the extension hold the buyer on the current step (e.g. disable "Pay now") while
+  # the eligibility check is still running, via useBuyerJourneyIntercept. Note: this API is
+  # deprecated in favour of server-side checkout validation Functions, but still works on
+  # the pinned 2025-07 version and is proportional to this UX-only guard.
+  block_progress = true
+
+  [extensions.settings]
+
+    [[extensions.settings.fields]]
+    key = "banner_title"
+    type = "single_line_text_field"
+    name = "Banner title"
+    description = "Title shown above the subscription options."
+
+    [[extensions.settings.fields]]
+    key = "banner_image"
+    type = "single_line_text_field"
+    name = "Banner image URL"
+    description = "Optional. Paste an image URL (upload it under Content > Files in Shopify Admin first, then copy its URL)."
+
+    [[extensions.settings.fields]]
+    key = "one_time_purchase_note"
+    type = "single_line_text_field"
+    name = "One-time purchase note"
+    description = "Optional text shown under the one-time purchase option (e.g. a shipping note). We don't calculate a real shipping fee here since it isn't known until the address step."
