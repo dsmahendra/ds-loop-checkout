@@ -162,19 +162,21 @@ function UpgradeBanner() {
 
   // Applies one selling plan (or null for one-time) to every given line — a shopper with
   // several eligible products in cart gets all of them upgraded together, since the widget
-  // shows a single shared frequency choice rather than one control per line.
+  // shows a single shared frequency choice rather than one control per line. Fired
+  // concurrently rather than awaited one at a time in series: a 5-item cart previously took
+  // 5x the round-trip time to finish applying the default plan before the widget settled.
   async function applyPlanToLines(lines: CartLine[], sellingPlanId: string | null) {
-    let hadError = false;
-    for (const line of lines) {
-      const response = await applyCartLinesChange({
-        type: "updateCartLine",
-        id: line.id,
-        sellingPlanId,
-        attributes: [...line.attributes],
-      });
-      if (response.type === "error") hadError = true;
-    }
-    return !hadError;
+    const responses = await Promise.all(
+      lines.map((line) =>
+        applyCartLinesChange({
+          type: "updateCartLine",
+          id: line.id,
+          sellingPlanId,
+          attributes: [...line.attributes],
+        }),
+      ),
+    );
+    return responses.every((response) => response.type !== "error");
   }
 
   // Clicking a card applies the change immediately — no separate confirm button.
