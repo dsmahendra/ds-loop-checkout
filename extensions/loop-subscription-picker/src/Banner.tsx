@@ -18,7 +18,7 @@ import {
   useTranslate,
 } from "@shopify/ui-extensions-react/checkout";
 import { Component, useEffect, useState, type ReactNode } from "react";
-import { fetchEligibleSellingPlans, type EligibleSellingPlan } from "./sellingPlans";
+import { fetchEligibleSellingPlansForVariants, type EligibleSellingPlan } from "./sellingPlans";
 import type { CartLine } from "@shopify/ui-extensions/checkout";
 
 const ONE_TIME_PURCHASE = "one-time-purchase";
@@ -90,18 +90,25 @@ function useEligibleUpgradeLines(cartLines: CartLine[]) {
       const eligibleVariantIds: string[] = [];
       let sharedPlans: EligibleSellingPlan[] | null = null;
 
-      for (const line of cartLines) {
-        try {
-          const plans = await fetchEligibleSellingPlans(query, line.merchandise.id);
-          if (cancelled) return;
+      try {
+        // One batched request for every cart line's variant, instead of one request per
+        // line awaited in series — this is what actually cuts checkout load time, since a
+        // multi-item cart previously paid N sequential round-trips before the widget settled.
+        const plansByVariantId = await fetchEligibleSellingPlansForVariants(
+          query,
+          cartLines.map((line) => line.merchandise.id),
+        );
+        if (cancelled) return;
+
+        for (const line of cartLines) {
+          const plans = plansByVariantId.get(line.merchandise.id) ?? [];
           if (plans.length > 0) {
             eligibleVariantIds.push(line.merchandise.id);
             if (!sharedPlans) sharedPlans = plans;
           }
-        } catch {
-          // Ignore and continue checking other lines — one line's fetch failure shouldn't
-          // hide the banner for the rest of the cart.
         }
+      } catch {
+        // Leave both empty — falls through to the non-live/fallback state below.
       }
 
       if (cancelled) return;

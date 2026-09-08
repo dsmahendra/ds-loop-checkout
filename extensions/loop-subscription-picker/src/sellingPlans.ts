@@ -5,9 +5,12 @@ import {
   SHIPPING_LABEL_METAFIELD,
 } from "./loopMetafields";
 
+// Batches every cart line's variant into one `nodes(ids:)` call instead of one `node(id:)`
+// request per line — a 3-product cart previously meant 3 sequential round-trips before the
+// widget could settle; this is exactly 1 request regardless of cart size.
 const ELIGIBLE_SELLING_PLANS_QUERY = `#graphql
   query LoopEligibleSellingPlans(
-    $id: ID!
+    $ids: [ID!]!
     $checkoutUpgradeNamespace: String!
     $checkoutUpgradeKey: String!
     $defaultSellingPlanNamespace: String!
@@ -17,8 +20,9 @@ const ELIGIBLE_SELLING_PLANS_QUERY = `#graphql
     $shippingLabelNamespace: String!
     $shippingLabelKey: String!
   ) {
-    node(id: $id) {
+    nodes(ids: $ids) {
       ... on ProductVariant {
+        id
         sellingPlanAllocations(first: 10) {
           edges {
             node {
@@ -67,26 +71,29 @@ export type EligibleSellingPlan = {
   shippingLabel: string | null;
 };
 
-type QueryResult = {
+type SellingPlanEdge = {
   node: {
-    sellingPlanAllocations?: {
-      edges: {
-        node: {
-          sellingPlan: {
-            id: string;
-            billingPolicy: { interval: string; intervalCount: number } | null;
-            priceAdjustments: {
-              adjustmentValue: { adjustmentPercentage?: number };
-            }[];
-            isSppAvailableOnCheckout: { value: string } | null;
-            isDefaultSellingPlan: { value: string } | null;
-            sellingPlanGroupPosition: { value: string } | null;
-            shippingLabel: { value: string } | null;
-          };
-        };
+    sellingPlan: {
+      id: string;
+      billingPolicy: { interval: string; intervalCount: number } | null;
+      priceAdjustments: {
+        adjustmentValue: { adjustmentPercentage?: number };
       }[];
+      isSppAvailableOnCheckout: { value: string } | null;
+      isDefaultSellingPlan: { value: string } | null;
+      sellingPlanGroupPosition: { value: string } | null;
+      shippingLabel: { value: string } | null;
     };
-  } | null;
+  };
+};
+
+type VariantNode = {
+  id: string;
+  sellingPlanAllocations?: { edges: SellingPlanEdge[] };
+};
+
+type QueryResult = {
+  nodes: (VariantNode | null)[];
 };
 
 type StorefrontQuery = <T>(
@@ -114,33 +121,7 @@ function formatDiscount(
   return `${percentageAdjustment.adjustmentValue.adjustmentPercentage}% off`;
 }
 
-// Implements steps 1 & 2 of Loop's upgrade-to-subscription-block guide: fetch a variant's
-// selling plans via the Storefront API, then filter to checkout-eligible plans, sort by
-// Loop's configured display order, and flag the merchant's chosen default plan.
-export async function fetchEligibleSellingPlans(
-  query: StorefrontQuery,
-  variantId: string,
-): Promise<EligibleSellingPlan[]> {
-  const { data, errors } = await query<QueryResult>(ELIGIBLE_SELLING_PLANS_QUERY, {
-    variables: {
-      id: variantId,
-      checkoutUpgradeNamespace: CHECKOUT_UPGRADE_METAFIELD.namespace,
-      checkoutUpgradeKey: CHECKOUT_UPGRADE_METAFIELD.key,
-      defaultSellingPlanNamespace: DEFAULT_SELLING_PLAN_METAFIELD.namespace,
-      defaultSellingPlanKey: DEFAULT_SELLING_PLAN_METAFIELD.key,
-      groupPositionNamespace: SELLING_PLAN_GROUP_POSITION_METAFIELD.namespace,
-      groupPositionKey: SELLING_PLAN_GROUP_POSITION_METAFIELD.key,
-      shippingLabelNamespace: SHIPPING_LABEL_METAFIELD.namespace,
-      shippingLabelKey: SHIPPING_LABEL_METAFIELD.key,
-    },
-  });
-
-  if (errors?.length || !data) {
-    throw new Error(errors?.[0]?.message ?? "Unknown error fetching selling plans");
-  }
-
-  const edges = data.node?.sellingPlanAllocations?.edges ?? [];
-
+function mapAllocationsToPlans(edges: SellingPlanEdge[]): EligibleSellingPlan[] {
   return edges
     .map(({ node }) => node.sellingPlan)
     .filter((plan) => plan.isSppAvailableOnCheckout?.value === "true")
@@ -165,4 +146,39 @@ export async function fetchEligibleSellingPlans(
         shippingLabel: plan.shippingLabel?.value || null,
       };
     });
+}
+
+// Implements steps 1 & 2 of Loop's upgrade-to-subscription-block guide: fetch every cart
+// line's variant selling plans in one Storefront API request, then per variant filter to
+// checkout-eligible plans, sort by Loop's configured display order, and flag the merchant's
+// chosen default plan.
+export async function fetchEligibleSellingPlansForVariants(
+  query: StorefrontQuery,
+  variantIds: string[],
+): Promise<Map<string, EligibleSellingPlan[]>> {
+  const { data, errors } = await query<QueryResult>(ELIGIBLE_SELLING_PLANS_QUERY, {
+    variables: {
+      ids: variantIds,
+      checkoutUpgradeNamespace: CHECKOUT_UPGRADE_METAFIELD.namespace,
+      checkoutUpgradeKey: CHECKOUT_UPGRADE_METAFIELD.key,
+      defaultSellingPlanNamespace: DEFAULT_SELLING_PLAN_METAFIELD.namespace,
+      defaultSellingPlanKey: DEFAULT_SELLING_PLAN_METAFIELD.key,
+      groupPositionNamespace: SELLING_PLAN_GROUP_POSITION_METAFIELD.namespace,
+      groupPositionKey: SELLING_PLAN_GROUP_POSITION_METAFIELD.key,
+      shippingLabelNamespace: SHIPPING_LABEL_METAFIELD.namespace,
+      shippingLabelKey: SHIPPING_LABEL_METAFIELD.key,
+    },
+  });
+
+  if (errors?.length || !data) {
+    throw new Error(errors?.[0]?.message ?? "Unknown error fetching selling plans");
+  }
+
+  const plansByVariantId = new Map<string, EligibleSellingPlan[]>();
+  for (const node of data.nodes) {
+    if (!node) continue;
+    const edges = node.sellingPlanAllocations?.edges ?? [];
+    plansByVariantId.set(node.id, mapAllocationsToPlans(edges));
+  }
+  return plansByVariantId;
 }
