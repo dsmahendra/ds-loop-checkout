@@ -270,7 +270,14 @@ function UpgradeBanner() {
           has no such built-in margin, so it's used here instead for a tighter, title-like line. */}
       <s-text type="strong">{settings.banner_title || "Unlock Subscriber Benefits"}</s-text>
 
-      {settings.banner_image && <s-image src={settings.banner_image} borderRadius="base" />}
+      {/* s-image defaults aspectRatio to '1/1' (a forced square) when inlineSize="fill", then
+          object-fit:contain centers the real (wide, short) banner graphic inside that square —
+          that forced square box, not stack gap, was the real source of the huge empty bands
+          above/below the banner. aspectRatio is set here to roughly match this banner's actual
+          proportions; a merchant uploading a differently-shaped image may need this adjusted. */}
+      {settings.banner_image && (
+        <s-image src={settings.banner_image} aspectRatio="11/4" borderRadius="base" />
+      )}
 
       {loading ? (
         // Proper loading state instead of showing the fallback cards while the real
