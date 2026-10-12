@@ -1,37 +1,34 @@
-// Migrated off @shopify/ui-extensions-react (React-based components), which Shopify stopped
-// accepting new deploys for once api_version 2025-07 was cut off (~Oct 2026). From 2025-10
-// onward, checkout UI extensions run on Preact with native `s-*` Polaris web components
-// instead of the old View/BlockStack/Button/etc. component set — see shopify.extension.toml.
-//
-// The hook names (useApi, useCartLines, useApplyCartLinesChange, useBuyerJourneyIntercept,
-// useSettings, useShippingAddress, useTranslate) are unchanged, just imported from
-// "@shopify/ui-extensions/checkout/preact" instead of "@shopify/ui-extensions-react/checkout".
-//
-// Type-only reference that registers the `s-*` Polaris web component JSX types for this
-// specific extension target (the generic "@shopify/ui-extensions/preact" entry point is
-// empty; each target's component set lives under its own target-specific subpath instead).
-// A triple-slash reference rather than a real import, since the target's ".d.ts" has no
-// runtime JS counterpart — esbuild warned about it being dropped as a dead side-effect import.
-/// <reference types="@shopify/ui-extensions/purchase.checkout.block.render" />
-import { render, Component, type ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
 import {
+  reactExtension,
+  Badge,
+  Banner,
+  BlockStack,
+  Button,
+  Grid,
+  Image,
+  InlineStack,
+  Spinner,
+  Text,
+  View,
   useApi,
   useApplyCartLinesChange,
   useBuyerJourneyIntercept,
   useCartLines,
   useSettings,
-  useShippingAddress,
   useTranslate,
-} from "@shopify/ui-extensions/checkout/preact";
+} from "@shopify/ui-extensions-react/checkout";
+import { Component, useEffect, useState, type ReactNode } from "react";
 import { fetchEligibleSellingPlansForVariants, type EligibleSellingPlan } from "./sellingPlans";
 import type { CartLine } from "@shopify/ui-extensions/checkout";
 
 const ONE_TIME_PURCHASE = "one-time-purchase";
 
 // Fixed card height, so all options are the same box regardless of how much text each one
-// carries. Roomy enough for a wrapped two-line label plus a detail line.
-const CARD_MIN_BLOCK_SIZE = "90px";
+// carries. Roomy enough for a wrapped two-line label plus a detail line, and to keep the
+// centred content clear of the badge overhanging the top border.
+const CARD_MIN_BLOCK_SIZE = 90;
+// Comfortably wider than the "Best value" pill, so the badge always has room for one line.
+const BADGE_MIN_INLINE_SIZE = 100;
 
 // Shown when no live eligible plan data is available yet (still loading, no eligible
 // cart line found, or the query failed) so the banner is never fully invisible while
@@ -45,28 +42,17 @@ type ExtensionSettings = {
   banner_title?: string;
   banner_image?: string;
   one_time_purchase_note?: string;
-  remote_one_time_purchase_note?: string;
 };
 
-// Australian states with higher one-time-purchase shipping. Checked against the shipping
-// address's provinceCode (e.g. "WA"), which Shopify only returns once this app has Level 2
-// "protected customer data" access approved in the Partner Dashboard — until then
-// useShippingAddress() returns undefined and this surcharge note never applies, so the
-// widget just falls back to the standard one_time_purchase_note instead of breaking.
-const REMOTE_SHIPPING_PROVINCE_CODES = ["WA", "TAS"];
-
-export default function extension() {
-  render(
-    <BannerErrorBoundary>
-      <UpgradeBanner />
-    </BannerErrorBoundary>,
-    document.body,
-  );
-}
+export default reactExtension("purchase.checkout.block.render", () => (
+  <BannerErrorBoundary>
+    <UpgradeBanner />
+  </BannerErrorBoundary>
+));
 
 // Surfaces any render-time crash directly on checkout instead of failing silently, so a
 // broken extension is diagnosable from the storefront without digging through DevTools.
-class BannerErrorBoundary extends Component<{ children: ComponentChildren }, { error: string | null }> {
+class BannerErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state: { error: string | null } = { error: null };
 
   static getDerivedStateFromError(error: unknown) {
@@ -75,7 +61,7 @@ class BannerErrorBoundary extends Component<{ children: ComponentChildren }, { e
 
   render() {
     if (this.state.error) {
-      return <s-banner tone="critical">Loop subscription widget error: {this.state.error}</s-banner>;
+      return <Banner status="critical">Loop subscription widget error: {this.state.error}</Banner>;
     }
     return this.props.children;
   }
@@ -144,7 +130,6 @@ function useEligibleUpgradeLines(cartLines: CartLine[]) {
 function UpgradeBanner() {
   const translate = useTranslate();
   const settings = useSettings<ExtensionSettings>();
-  const shippingAddress = useShippingAddress();
   const cartLines = useCartLines();
   const applyCartLinesChange = useApplyCartLinesChange();
   const { result, loading } = useEligibleUpgradeLines(cartLines);
@@ -231,16 +216,6 @@ function UpgradeBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 
-  // One-time purchase costs more to ship to WA/TAS — swap in the merchant's configured
-  // remote-shipping note when the buyer's province matches, otherwise show the standard note.
-  const isRemoteShippingProvince = Boolean(
-    shippingAddress?.provinceCode &&
-      REMOTE_SHIPPING_PROVINCE_CODES.includes(shippingAddress.provinceCode.toUpperCase()),
-  );
-  const oneTimePurchaseNote = isRemoteShippingProvince
-    ? settings.remote_one_time_purchase_note || settings.one_time_purchase_note || null
-    : settings.one_time_purchase_note || null;
-
   // One flat list so the frequency plans and one-time purchase render as identical cards in
   // the same equal-width grid, instead of the one-time option being a differently-built card.
   const cards = [
@@ -256,41 +231,48 @@ function UpgradeBanner() {
       label: translate("oneTimePurchase"),
       badge: null,
       shippingLabel: null,
-      discountLabel: oneTimePurchaseNote,
+      discountLabel: settings.one_time_purchase_note || null,
     },
   ];
 
   return (
-    <s-stack direction="block" gap="large" padding="base" border="base" borderRadius="base" inlineSize="100%">
-      <s-heading>{settings.banner_title || "Unlock Subscriber Benefits"}</s-heading>
+    <BlockStack spacing="loose" padding="base" border="base" cornerRadius="base" inlineSize="fill">
+      <Text emphasis="bold" size="large">
+        {settings.banner_title || "Unlock Subscriber Benefits"}
+      </Text>
 
-      {settings.banner_image && <s-image src={settings.banner_image} borderRadius="base" />}
+      {settings.banner_image && (
+        <Image source={settings.banner_image} cornerRadius="base" />
+      )}
 
       {loading ? (
         // Proper loading state instead of showing the fallback cards while the real
         // eligibility check is still in flight — avoids flashing placeholder frequency
         // options that might not match what's actually available.
-        <s-stack direction="inline" gap="small" alignItems="center">
-          <s-spinner size="small" />
-          <s-text type="small" color="subdued">
+        <InlineStack spacing="tight" blockAlignment="center">
+          <Spinner size="small" />
+          <Text appearance="subdued" size="small">
             Checking this cart for eligible subscription products…
-          </s-text>
-        </s-stack>
+          </Text>
+        </InlineStack>
       ) : (
         <>
           {!isLive && (
-            <s-text type="small" color="subdued">
+            <Text appearance="subdued" size="small">
               Preview — no eligible subscription product found in this cart yet.
-            </s-text>
+            </Text>
           )}
 
-          {applyError && <s-banner tone="critical">{translate("errorLabel")}</s-banner>}
+          {applyError && <Banner status="critical">{translate("errorLabel")}</Banner>}
 
-          <s-stack direction="block" gap="large" inlineSize="100%">
-            <s-text type="small" color="subdued">
+          <BlockStack spacing="loose" inlineSize="fill">
+            <Text size="small" appearance="subdued" emphasis="bold">
               Frequency
-            </s-text>
-            <s-grid gridTemplateColumns={`repeat(${cards.length}, 1fr)`} gap="base" inlineSize="100%">
+            </Text>
+            {/* Grid (not InlineStack) so every card gets an equal share of the row: InlineStack
+                sizes each Button to its own label, which made "One-time purchase" much wider
+                than the frequency cards. */}
+            <Grid columns={cards.map(() => "fill")} spacing="base" inlineSize="fill">
               {cards.map((card) => (
                 <PlanCard
                   key={card.id}
@@ -304,11 +286,11 @@ function UpgradeBanner() {
                   onPress={() => selectPlan(card.id)}
                 />
               ))}
-            </s-grid>
-          </s-stack>
+            </Grid>
+          </BlockStack>
         </>
       )}
-    </s-stack>
+    </BlockStack>
   );
 }
 
@@ -332,36 +314,75 @@ function PlanCard({
   onPress: () => void;
 }) {
   return (
-    // The old React API let the "Best value" badge sit absolutely-positioned, straddling
-    // the card's top border — `s-box`/`s-stack` in the new Polaris web component set have no
-    // position/translate props (a deliberate constraint of the new system), so the badge is
-    // shown inline at the top of the card's content instead.
-    <s-button
-      variant={selected ? "primary" : "secondary"}
-      loading={pending}
-      disabled={disabled}
-      inlineSize="fill"
-      onClick={onPress}
-      accessibilityLabel={badge ? `${label} — ${badge}` : label}
-    >
-      <s-stack
-        direction="block"
-        gap="small-200"
-        padding="small-200"
-        minBlockSize={CARD_MIN_BLOCK_SIZE}
-        justifyContent="center"
-        alignItems="center"
-        inlineSize="100%"
-      >
-        {badge && (
-          <s-badge tone="critical" size="small">
-            {badge}
-          </s-badge>
-        )}
-        <s-text type="strong">{label}</s-text>
-        {shippingLabel && <s-text type="strong">{shippingLabel}</s-text>}
-        {discountLabel && <s-text type="small">{discountLabel}</s-text>}
-      </s-stack>
-    </s-button>
+    // Relative wrapper purely so the badge can be positioned against the card's edges.
+    <View position={{ type: "relative" }} inlineSize="fill">
+      {/* Button has no sizing props, so it only fills its container when it is itself a grid
+          item — nesting this single `fill` column is what keeps every card the same width
+          now that the Button sits inside the positioning wrapper rather than in the row grid
+          directly. */}
+      <Grid columns={["fill"]} inlineSize="fill">
+        <Button
+          kind={selected ? "primary" : "secondary"}
+          loading={pending}
+          disabled={disabled}
+          onPress={onPress}
+          accessibilityLabel={badge ? `${label} — ${badge}` : label}
+        >
+          <View
+            padding="extraTight"
+            minBlockSize={CARD_MIN_BLOCK_SIZE}
+            blockAlignment="center"
+            inlineSize="fill"
+          >
+            <BlockStack spacing="extraTight" inlineAlignment="center">
+              <Text emphasis="bold">{label}</Text>
+              {shippingLabel && (
+                <Text size="small" emphasis="bold">
+                  {shippingLabel}
+                </Text>
+              )}
+              {discountLabel && <Text size="small">{discountLabel}</Text>}
+            </BlockStack>
+          </View>
+        </Button>
+      </Grid>
+
+      {/* Taken out of flow and pulled up by half its own height so it straddles the top
+          border, centred on the card. Being absolute, it costs no layout height — the badged
+          card stays exactly as tall as its neighbours without a reserved slot. */}
+      {badge && (
+        // Full-width strip rather than a 50%-inset box: an absolutely positioned element
+        // shrink-to-fits within the space left after its inset, so anchoring at 50% capped
+        // the badge at half the card and wrapped "Best value" onto two lines on mobile.
+        // Spanning the card and centring inside it gives the badge the full width to sit on.
+        <View
+          position={{ type: "absolute", blockStart: 0, inlineStart: "50%" }}
+          translate={{ block: "-50%", inline: "-50%" }}
+        >
+          {/* Centred by anchor maths, not by width: `inlineSize` has no effect on an
+              absolutely positioned View here, so the box stays shrink-to-fit and no
+              alignment prop inside it has room to work. Pinning its inline start to the
+              card's midpoint and pulling it back by half its own width centres it whatever
+              it measures. `blockAlignment` keeps the pill its natural height rather than
+              stretching to the box.
+
+              `minInlineSize` on this in-flow child is what stops the pill wrapping on
+              mobile: anchored at 50%, the box would otherwise shrink to the half-card left
+              over and break "Best value" across two lines. A child minimum raises the box's
+              own min-content width, so it keeps the pill on one line and the translate
+              still centres it. */}
+          <InlineStack
+            minInlineSize={BADGE_MIN_INLINE_SIZE}
+            inlineAlignment="center"
+            blockAlignment="center"
+            spacing="none"
+          >
+            <Badge tone="critical" size="small">
+              {badge}
+            </Badge>
+          </InlineStack>
+        </View>
+      )}
+    </View>
   );
 }

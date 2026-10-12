@@ -1,10 +1,10 @@
 # Learn more: https://shopify.dev/docs/api/checkout-ui-extensions
 #
-# 2025-10 is the oldest API version Shopify still accepts new deploys for
-# (2025-07 and earlier were cut off ~Oct 2026) and the oldest version built on
-# Preact + native s-* Polaris web components, which replaced the React-based
-# component set used before. See src/Banner.tsx for the migrated implementation.
-api_version = "2025-10"
+# Pinned to 2025-07: @shopify/ui-extensions-react has no published release for
+# later API versions (2025-10+ only ship for the non-React @shopify/ui-extensions
+# base package), so this is the newest version that still supports the React
+# hooks/components used in src/Checkout.tsx.
+api_version = "2025-07"
 
 [[extensions]]
 name = "Loop Subscription Picker"
@@ -45,9 +45,3 @@ type = "ui_extension"
     type = "single_line_text_field"
     name = "One-time purchase note"
     description = "Optional text shown under the one-time purchase option (e.g. a shipping note). We don't calculate a real shipping fee here since it isn't known until the address step."
-
-    [[extensions.settings.fields]]
-    key = "remote_one_time_purchase_note"
-    type = "single_line_text_field"
-    name = "One-time purchase note (WA & TAS)"
-    description = "Shown instead of the note above when the shipping address is in Western Australia or Tasmania (e.g. a higher shipping cost for remote areas). Requires this app to have Level 2 protected customer data access approved in the Partner Dashboard, otherwise the standard note above is always shown."
