@@ -276,7 +276,7 @@ function UpgradeBanner() {
           above/below the banner. aspectRatio is set here to roughly match this banner's actual
           proportions; a merchant uploading a differently-shaped image may need this adjusted. */}
       {settings.banner_image && (
-        <s-image src={settings.banner_image} aspectRatio="11/4" borderRadius="base" />
+        <s-image src={settings.banner_image} aspectRatio="7/3" borderRadius="base" />
       )}
 
       {loading ? (
