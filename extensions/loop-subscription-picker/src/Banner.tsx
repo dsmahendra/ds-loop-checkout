@@ -345,10 +345,12 @@ function PlanCard({
   onPress: () => void;
 }) {
   return (
-    // The old React API let the "Best value" badge sit absolutely-positioned, straddling
-    // the card's top border — `s-box`/`s-stack` in the new Polaris web component set have no
-    // position/translate props (a deliberate constraint of the new system), so the badge is
-    // shown inline at the top of the card's content instead.
+    // Confirmed there's no way to make the badge straddle the card's top border in this
+    // component system: no position/translate props (checked during migration), and
+    // s-grid-item's gridRow/gridColumn only accept "auto" or "span N" — not explicit line
+    // ranges — so true overlapping cell placement isn't possible either. Both are deliberate
+    // constraints of the new Polaris web component set, not a gap in this implementation.
+    // The badge is shown inline at the top of the card's content instead.
     <s-button
       variant={selected ? "primary" : "secondary"}
       loading={pending}
