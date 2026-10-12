@@ -261,7 +261,10 @@ function UpgradeBanner() {
   ];
 
   return (
-    <s-stack direction="block" gap="base" padding="base" border="base" borderRadius="base" inlineSize="100%">
+    // "base" on this design system's gap scale turned out to be a much bigger vertical gap
+    // in practice than its "base" padding counterpart — swapped to "small" to actually match
+    // the old tight layout, since there's no documented px mapping to compute this up front.
+    <s-stack direction="block" gap="small" padding="base" border="base" borderRadius="base" inlineSize="100%">
       {/* s-heading carries its own large built-in margin with no prop to reduce it, which
           was stacking with our own gap and blowing out the space below the title — s-text
           has no such built-in margin, so it's used here instead for a tighter, title-like line. */}
@@ -289,7 +292,7 @@ function UpgradeBanner() {
 
           {applyError && <s-banner tone="critical">{translate("errorLabel")}</s-banner>}
 
-          <s-stack direction="block" gap="base" inlineSize="100%">
+          <s-stack direction="block" gap="small" inlineSize="100%">
             <s-text type="small" color="subdued">
               Frequency
             </s-text>
