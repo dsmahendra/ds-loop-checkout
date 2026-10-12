@@ -303,7 +303,12 @@ function UpgradeBanner() {
             <s-text type="small" color="subdued">
               Frequency
             </s-text>
-            <s-grid gridTemplateColumns={`repeat(${cards.length}, 1fr)`} gap="base" inlineSize="100%">
+            <s-grid
+              gridTemplateColumns={`repeat(${cards.length}, 1fr)`}
+              gap="small"
+              alignItems="end"
+              inlineSize="100%"
+            >
               {cards.map((card) => (
                 <PlanCard
                   key={card.id}
@@ -345,38 +350,41 @@ function PlanCard({
   onPress: () => void;
 }) {
   return (
-    // Confirmed there's no way to make the badge straddle the card's top border in this
-    // component system: no position/translate props (checked during migration), and
-    // s-grid-item's gridRow/gridColumn only accept "auto" or "span N" — not explicit line
-    // ranges — so true overlapping cell placement isn't possible either. Both are deliberate
-    // constraints of the new Polaris web component set, not a gap in this implementation.
-    // The badge is shown inline at the top of the card's content instead.
-    <s-button
-      variant={selected ? "primary" : "secondary"}
-      loading={pending}
-      disabled={disabled}
-      inlineSize="fill"
-      onClick={onPress}
-      accessibilityLabel={badge ? `${label} — ${badge}` : label}
-    >
-      <s-stack
-        direction="block"
-        gap="small-200"
-        padding="small-200"
-        minBlockSize={CARD_MIN_BLOCK_SIZE}
-        justifyContent="center"
-        alignItems="center"
-        inlineSize="100%"
-      >
-        {badge && (
+    // A badge can't straddle the border here: no position/translate props, and
+    // s-grid-item's gridRow/gridColumn only accept "auto" or "span N", so cells can't overlap.
+    // Closest achievable: the badge sits directly on top of the card's border, touching it.
+    // The row grid bottom-aligns its cells, so the badged card's extra height goes above its
+    // button and every button's top border still lines up with its neighbours.
+    <s-stack direction="block" gap="none" inlineSize="100%">
+      {badge && (
+        <s-stack direction="block" alignItems="center" inlineSize="100%">
           <s-badge tone="critical" size="small">
             {badge}
           </s-badge>
-        )}
-        <s-text type="strong">{label}</s-text>
-        {shippingLabel && <s-text type="strong">{shippingLabel}</s-text>}
-        {discountLabel && <s-text type="small">{discountLabel}</s-text>}
-      </s-stack>
-    </s-button>
+        </s-stack>
+      )}
+      <s-button
+        variant={selected ? "primary" : "secondary"}
+        loading={pending}
+        disabled={disabled}
+        inlineSize="fill"
+        onClick={onPress}
+        accessibilityLabel={badge ? `${label} — ${badge}` : label}
+      >
+        <s-stack
+          direction="block"
+          gap="small-200"
+          padding="small-200"
+          minBlockSize={CARD_MIN_BLOCK_SIZE}
+          justifyContent="center"
+          alignItems="center"
+          inlineSize="100%"
+        >
+          <s-text type="strong">{label}</s-text>
+          {shippingLabel && <s-text type="strong">{shippingLabel}</s-text>}
+          {discountLabel && <s-text type="small">{discountLabel}</s-text>}
+        </s-stack>
+      </s-button>
+    </s-stack>
   );
 }
