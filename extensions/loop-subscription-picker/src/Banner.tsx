@@ -261,8 +261,11 @@ function UpgradeBanner() {
   ];
 
   return (
-    <s-stack direction="block" gap="large" padding="base" border="base" borderRadius="base" inlineSize="100%">
-      <s-heading>{settings.banner_title || "Unlock Subscriber Benefits"}</s-heading>
+    <s-stack direction="block" gap="base" padding="base" border="base" borderRadius="base" inlineSize="100%">
+      {/* s-heading carries its own large built-in margin with no prop to reduce it, which
+          was stacking with our own gap and blowing out the space below the title — s-text
+          has no such built-in margin, so it's used here instead for a tighter, title-like line. */}
+      <s-text type="strong">{settings.banner_title || "Unlock Subscriber Benefits"}</s-text>
 
       {settings.banner_image && <s-image src={settings.banner_image} borderRadius="base" />}
 
@@ -286,7 +289,7 @@ function UpgradeBanner() {
 
           {applyError && <s-banner tone="critical">{translate("errorLabel")}</s-banner>}
 
-          <s-stack direction="block" gap="large" inlineSize="100%">
+          <s-stack direction="block" gap="base" inlineSize="100%">
             <s-text type="small" color="subdued">
               Frequency
             </s-text>
